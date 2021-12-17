@@ -12,7 +12,7 @@ class Board:
         self.left = 10
         s = set()
         k = 0
-        while len(s) < 199:
+        while len(s) < 100:
             s.add(randint(0, WIDTH * HEIGHT - 1))
         for n, i in enumerate(self.board):
             for m, j in enumerate(i):
@@ -132,19 +132,41 @@ class Sprite(pygame.sprite.Sprite):
 
 
 class Player(Sprite):
-    def __init__(self, *group, x=0, y=0, file="texture.png"):
+    def __init__(self, *group, x=0, y=0, file="texture.png", lives=5):
         super().__init__(*group, x=x, y=y, file=file)
         self.direction = 1
+        self.file = file
+        self.a = 1
+        self.lives = lives
+        if group[0] == first_players:
+            x = board.left
+            for i in range(lives):
+                Heart(first_hearts, x=x, y=1023, file="heart.png")
+                x += board.cell_size + 5
+        else:
+            x = 1900 + board.left - board.cell_size
+            for i in range(lives):
+                Heart(second_hearts, x=x, y=1023, file="heart.png")
+                x -= board.cell_size + 5
 
     def update(self, x, y):
-        self.rect.x, self.rect.y = x, y
+        if self.a:
+            self.rect.x, self.rect.y = x, y
 
     def flip(self):
-        self.image = pygame.transform.flip(self.image, True, False)
-        self.direction = 0 if self.direction else 1
+        if self.a:
+            self.image = pygame.transform.flip(self.image, True, False)
+            self.direction = 0 if self.direction else 1
+
+    def damage(self, d):
+        self.lives -= d
+        if self.lives < 1:
+            self.die()
 
     def die(self):
-        self.kill()
+        if self.a:
+            self.image = pygame.image.load(f"data/dead_{self.file}")
+            self.a = 0
 
 
 class Wall(Sprite):
@@ -156,28 +178,39 @@ class Puddle(Sprite):
 
 
 class Bullet(Sprite):
-    def __init__(self, *group, x=0, y=0, file="texture.png", direction=None, enemy=None):
+    def __init__(self, *group, x=0, y=0, file="texture.png", direction=None, enemy=None, speed=5):
         super().__init__(*group, x=x, y=y, file=file)
         self.direction = direction
         if direction == 0 or direction == 2:
             self.image = pygame.transform.rotate(self.image, 90)
         self.enemy = enemy
+        self.speed = speed
 
     def update(self):
         if pygame.sprite.spritecollideany(self, walls):
             self.kill()
         elif pygame.sprite.spritecollideany(self, self.enemy):
-            pygame.sprite.spritecollideany(self, self.enemy).die()
+            pygame.sprite.spritecollideany(self, self.enemy).damage(1)
             self.kill()
+            if self.enemy == second_players and second_hearts.sprites():
+                second_hearts.sprites()[-1].kill()
+            elif self.enemy == first_players and first_hearts.sprites():
+                first_hearts.sprites()[-1].kill()
+        # elif len(pygame.sprite.spritecollide(self, bullets, False)) > 1:
+        #     pygame.sprite.spritecollide(self, bullets, True)
         else:
             if self.direction == 0:
-                self.rect.y -= 1
+                self.rect.y -= self.speed
             elif self.direction == 1:
-                self.rect.x += 1
+                self.rect.x += self.speed
             elif self.direction == 2:
-                self.rect.y += 1
+                self.rect.y += self.speed
             elif self.direction == 3:
-                self.rect.x -= 1
+                self.rect.x -= self.speed
+
+
+class Heart(Sprite):
+    pass
 
 
 pygame.init()
@@ -187,11 +220,14 @@ first_players = pygame.sprite.Group()
 second_players = pygame.sprite.Group()
 water = pygame.sprite.Group()
 bullets = pygame.sprite.Group()
-WIDTH, HEIGHT = 38, 21
+first_hearts = pygame.sprite.Group()
+second_hearts = pygame.sprite.Group()
+WIDTH, HEIGHT = 38, 20
 board = Board(WIDTH, HEIGHT)
 running = True
-first_player = Player(first_players, x=10, y=15, file="first_player.png")
-second_player = Player(second_players, x=1860, y=1015, file="second_player.png")
+first_player = Player(first_players, x=board.left, y=board.top, file="first_player.png")
+second_player = Player(second_players, x=1920 - 20 + board.left - board.cell_size,
+                       y=1080 - 30 + board.top - board.cell_size, file="second_player.png")
 second_player.flip()
 background = pygame.image.load("data/background.png")
 while running:
@@ -215,30 +251,32 @@ while running:
                 board.down2()
             if event.key == pygame.K_LEFT:
                 board.left2()
-            if event.key == pygame.K_t:
-                Bullet(bullets, x=first_player.rect.x + 20, y=first_player.rect.y - 30, file="bullet.png", direction=0,
-                       enemy=second_players)
-            if event.key == pygame.K_h:
-                Bullet(bullets, x=first_player.rect.x + 50, y=first_player.rect.y + 20, file="bullet.png", direction=1,
-                       enemy=second_players)
-            if event.key == pygame.K_g:
-                Bullet(bullets, x=first_player.rect.x + 20, y=first_player.rect.y + 50, file="bullet.png", direction=2,
-                       enemy=second_players)
-            if event.key == pygame.K_f:
-                Bullet(bullets, x=first_player.rect.x - 30, y=first_player.rect.y + 20, file="bullet.png", direction=3,
-                       enemy=second_players)
-            if event.key == pygame.K_KP5:
-                Bullet(bullets, x=second_player.rect.x + 20, y=second_player.rect.y - 30, file="bullet.png",
-                       direction=0, enemy=first_players)
-            if event.key == pygame.K_KP3:
-                Bullet(bullets, x=second_player.rect.x + 50, y=second_player.rect.y + 20, file="bullet.png",
-                       direction=1, enemy=first_players)
-            if event.key == pygame.K_KP2:
-                Bullet(bullets, x=second_player.rect.x + 20, y=second_player.rect.y + 50, file="bullet.png",
-                       direction=2, enemy=first_players)
-            if event.key == pygame.K_KP1:
-                Bullet(bullets, x=second_player.rect.x - 30, y=second_player.rect.y + 20, file="bullet.png",
-                       direction=3, enemy=first_players)
+            if first_player.a:
+                if event.key == pygame.K_t:
+                    Bullet(bullets, x=first_player.rect.x + 20, y=first_player.rect.y - 30, file="bullet.png",
+                           direction=0, enemy=second_players)
+                if event.key == pygame.K_h:
+                    Bullet(bullets, x=first_player.rect.x + 50, y=first_player.rect.y + 20, file="bullet.png",
+                           direction=1, enemy=second_players)
+                if event.key == pygame.K_g:
+                    Bullet(bullets, x=first_player.rect.x + 20, y=first_player.rect.y + 50, file="bullet.png",
+                           direction=2, enemy=second_players)
+                if event.key == pygame.K_f:
+                    Bullet(bullets, x=first_player.rect.x - 30, y=first_player.rect.y + 20, file="bullet.png",
+                           direction=3, enemy=second_players)
+            if second_player.a:
+                if event.key == pygame.K_KP5:
+                    Bullet(bullets, x=second_player.rect.x + 20, y=second_player.rect.y - 30, file="bullet.png",
+                           direction=0, enemy=first_players)
+                if event.key == pygame.K_KP3:
+                    Bullet(bullets, x=second_player.rect.x + 50, y=second_player.rect.y + 20, file="bullet.png",
+                           direction=1, enemy=first_players)
+                if event.key == pygame.K_KP2:
+                    Bullet(bullets, x=second_player.rect.x + 20, y=second_player.rect.y + 50, file="bullet.png",
+                           direction=2, enemy=first_players)
+                if event.key == pygame.K_KP1:
+                    Bullet(bullets, x=second_player.rect.x - 30, y=second_player.rect.y + 20, file="bullet.png",
+                           direction=3, enemy=first_players)
     screen.blit(background, (0, 0))
     board.render()
     first_players.draw(screen)
@@ -247,4 +285,6 @@ while running:
     water.draw(screen)
     bullets.update()
     bullets.draw(screen)
+    first_hearts.draw(screen)
+    second_hearts.draw(screen)
     pygame.display.flip()
