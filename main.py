@@ -1,5 +1,7 @@
 import pygame
 from random import randint, random
+import datetime as dt
+import pymorphy2
 
 
 class Board:
@@ -132,7 +134,7 @@ class Sprite(pygame.sprite.Sprite):
 
 
 class Player(Sprite):
-    def __init__(self, *group, x=100, y=100, file="texture.png", lives=5):
+    def __init__(self, *group, x=100, y=100, file="texture.png", lives=5, nick="Player"):
         super().__init__(*group, x=x, y=y, file=file)
         self.direction = 1
         self.file = file
@@ -148,6 +150,7 @@ class Player(Sprite):
             for i in range(lives):
                 Heart(second_hearts, x=x, y=1023, file="heart.png")
                 x -= board.cell_size + 5
+        self.nick = nick
 
     def update(self, x, y):
         if self.a:
@@ -178,6 +181,16 @@ class Player(Sprite):
     def die(self):
         if self.a:
             self.image = pygame.image.load(f"data/dead_{self.file}")
+            file = open("victories.txt", "a")
+            word = morph.parse('секунда')[0]
+            word2 = morph.parse('выстрел')[0]
+            t = self.nick == sn
+            file.write(
+                f"{fn if t else sn} победил {self.nick} за {pygame.time.get_ticks() / 1000} "
+                f"{word.make_agree_with_number(pygame.time.get_ticks() // 1000).word} и {fshots if t else sshots} "
+                f"{word2.make_agree_with_number(fshots if t else sshots).word} в "
+                f"{dt.datetime.now().time().isoformat(timespec='minutes')}\n")
+            file.close()
             self.a = 0
 
 
@@ -191,7 +204,12 @@ class Puddle(Sprite):
 
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, *group, x=100, y=100, file=None, direction=None, enemy=None, speed=5, damage=1, w=30):
+        global fshots, sshots
         super().__init__(*group)
+        if enemy == second_players:
+            fshots += 1
+        else:
+            sshots += 1
         if file is None:
             self.image = pygame.Surface((w, 10), pygame.SRCALPHA, 32)
             self.image.fill("grey")
@@ -240,14 +258,19 @@ water = pygame.sprite.Group()
 bullets = pygame.sprite.Group()
 first_hearts = pygame.sprite.Group()
 second_hearts = pygame.sprite.Group()
+morph = pymorphy2.MorphAnalyzer()
+fshots = 0
+sshots = 0
 WIDTH, HEIGHT = 38, 20
 board = Board(WIDTH, HEIGHT)
 running = True
 fl = 3  # жизни
 sl = 3
-first_player = Player(first_players, x=board.left, y=board.top, file="first_player.png", lives=fl)
+fn = "Player 1"  # ники
+sn = "Player 2"
+first_player = Player(first_players, x=board.left, y=board.top, file="first_player.png", lives=fl, nick=fn)
 second_player = Player(second_players, x=1920 - 20 + board.left - board.cell_size,
-                       y=1080 - 30 + board.top - board.cell_size, file="second_player.png", lives=sl)
+                       y=1080 - 30 + board.top - board.cell_size, file="second_player.png", lives=sl, nick=sn)
 second_player.flip()
 background = pygame.image.load("data/background.png")
 first_reload = pygame.USEREVENT + 1
