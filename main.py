@@ -1,32 +1,44 @@
 import pygame
-from random import randint, random
+from random import randint, random, choice
 import datetime as dt
 import pymorphy2
+from maps import MAPS
 
 
 class Board:
     def __init__(self, width, height):
+        global FS, SS
         self.width = width
         self.height = height
         self.cell_size = 50
         self.board = [[0] * self.width for _ in range(self.height)]
         self.top = 15
         self.left = 10
-        s = set()
-        k = 0
-        while len(s) < WIDTH * HEIGHT // 7:
-            s.add(randint(0, WIDTH * HEIGHT - 1))
+        # s = set()
+        # k = 0
+        # while len(s) < WIDTH * HEIGHT // 7:
+        #     s.add(randint(0, WIDTH * HEIGHT - 1))
+        # for n, i in enumerate(self.board):
+        #     for m, j in enumerate(i):
+        #         if k in s and (n != 0 or m != 0) and (n != HEIGHT - 1 or m != WIDTH - 1):
+        #             if random() < 0.5:
+        #                 self.board[n][m] = 1
+        #                 Wall(walls, x=self.left + self.cell_size * m, y=self.top + self.cell_size * n, file="wall.png")
+        #             else:
+        #                 self.board[n][m] = 4
+        #                 Puddle(water, x=self.left + self.cell_size * m, y=self.top + self.cell_size * n,
+        #                        file="puddle.png")
+        #         k += 1
+        c = choice(MAPS)
+        self.board = c[0]
+        FS = c[1]  # скорость пули
+        SS = c[1]
         for n, i in enumerate(self.board):
             for m, j in enumerate(i):
-                if k in s and (n != 0 or m != 0) and (n != HEIGHT - 1 or m != WIDTH - 1):
-                    if random() < 0.5:
-                        self.board[n][m] = 1
-                        Wall(walls, x=self.left + self.cell_size * m, y=self.top + self.cell_size * n, file="wall.png")
-                    else:
-                        self.board[n][m] = 4
-                        Puddle(water, x=self.left + self.cell_size * m, y=self.top + self.cell_size * n,
-                               file="puddle.png")
-                k += 1
+                if j == 1:
+                    Wall(walls, x=self.left + self.cell_size * m, y=self.top + self.cell_size * n, file="wall.png")
+                elif j == 4:
+                    Puddle(water, x=self.left + self.cell_size * m, y=self.top + self.cell_size * n, file="puddle.png")
         self.board[0][0] = 2
         self.board[HEIGHT - 1][WIDTH - 1] = 3
         self.f, self.s = [0, 0], [HEIGHT - 1, WIDTH - 1]
@@ -279,8 +291,6 @@ r1 = 1
 r2 = 1
 tr1 = 100  # время перезарядки
 tr2 = 100
-fs = 10  # скорость пули
-ss = 10
 fd = 1  # наносимый урон
 sd = 1
 fw = 30  # длина пули
@@ -309,43 +319,43 @@ while running:
             if first_player.a and r1:
                 if event.key == pygame.K_i:
                     Bullet(bullets, x=first_player.rect.x + 20, y=first_player.rect.y - 30, w=fw, direction=0,
-                           enemy=second_players, speed=fs, damage=fd)
+                           enemy=second_players, speed=FS, damage=fd)
                     r1 = 0
                     pygame.time.set_timer(first_reload, tr1)
                 if event.key == pygame.K_l:
                     Bullet(bullets, x=first_player.rect.x + 50, y=first_player.rect.y + 20, w=fw, direction=1,
-                           enemy=second_players, speed=fs, damage=fd)
+                           enemy=second_players, speed=FS, damage=fd)
                     r1 = 0
                     pygame.time.set_timer(first_reload, tr1)
                 if event.key == pygame.K_k:
                     Bullet(bullets, x=first_player.rect.x + 20, y=first_player.rect.y + 50, w=fw, direction=2,
-                           enemy=second_players, speed=fs, damage=fd)
+                           enemy=second_players, speed=FS, damage=fd)
                     r1 = 0
                     pygame.time.set_timer(first_reload, tr1)
                 if event.key == pygame.K_j:
                     Bullet(bullets, x=first_player.rect.x - 30, y=first_player.rect.y + 20, w=fw, direction=3,
-                           enemy=second_players, speed=fs, damage=fd)
+                           enemy=second_players, speed=FS, damage=fd)
                     r1 = 0
                     pygame.time.set_timer(first_reload, tr1)
             if second_player.a and r2:
                 if event.key == pygame.K_KP5:
                     Bullet(bullets, x=second_player.rect.x + 20, y=second_player.rect.y - 30, w=sw, direction=0,
-                           enemy=first_players, speed=ss, damage=sd)
+                           enemy=first_players, speed=SS, damage=sd)
                     r2 = 0
                     pygame.time.set_timer(second_reload, tr2)
                 if event.key == pygame.K_KP3:
                     Bullet(bullets, x=second_player.rect.x + 50, y=second_player.rect.y + 20, w=sw, direction=1,
-                           enemy=first_players, speed=ss, damage=sd)
+                           enemy=first_players, speed=SS, damage=sd)
                     r2 = 0
                     pygame.time.set_timer(second_reload, tr2)
                 if event.key == pygame.K_KP2:
                     Bullet(bullets, x=second_player.rect.x + 20, y=second_player.rect.y + 50, w=sw, direction=2,
-                           enemy=first_players, speed=ss, damage=sd)
+                           enemy=first_players, speed=SS, damage=sd)
                     r2 = 0
                     pygame.time.set_timer(second_reload, tr2)
                 if event.key == pygame.K_KP1:
                     Bullet(bullets, x=second_player.rect.x - 30, y=second_player.rect.y + 20, w=sw, direction=3,
-                           enemy=first_players, speed=ss, damage=sd)
+                           enemy=first_players, speed=SS, damage=sd)
                     r2 = 0
                     pygame.time.set_timer(second_reload, tr2)
         if event.type == first_reload:
