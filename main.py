@@ -12,7 +12,7 @@ class Board:
         self.left = 10
         s = set()
         k = 0
-        while len(s) < 199:
+        while len(s) < WIDTH * HEIGHT // 7:
             s.add(randint(0, WIDTH * HEIGHT - 1))
         for n, i in enumerate(self.board):
             for m, j in enumerate(i):
@@ -70,6 +70,8 @@ class Board:
             self.board[x][y] = 0
             self.f[1] += 1
             self.board[x][y + 1] = 2
+        if first_player.direction == 0:
+            first_player.flip()
 
     def down1(self):
         x, y = self.f
@@ -84,6 +86,8 @@ class Board:
             self.board[x][y] = 0
             self.f[1] -= 1
             self.board[x][y - 1] = 2
+        if first_player.direction:
+            first_player.flip()
 
     def up2(self):
         x, y = self.s
@@ -98,6 +102,8 @@ class Board:
             self.board[x][y] = 0
             self.s[1] += 1
             self.board[x][y + 1] = 3
+        if second_player.direction == 0:
+            second_player.flip()
 
     def down2(self):
         x, y = self.s
@@ -112,21 +118,67 @@ class Board:
             self.board[x][y] = 0
             self.s[1] -= 1
             self.board[x][y - 1] = 3
+        if second_player.direction:
+            second_player.flip()
 
 
 class Sprite(pygame.sprite.Sprite):
-    def __init__(self, *group, x=0, y=0, file="texture.png"):
+    def __init__(self, *group, x=100, y=100, file="texture.png"):
         super().__init__(*group)
         self.image = pygame.image.load(f"data/{file}")
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = x, y
-
-    def update(self, x, y):
-        self.rect.x, self.rect.y = x, y
+        self.mask = pygame.mask.from_surface(self.image)
 
 
 class Player(Sprite):
-    pass
+    def __init__(self, *group, x=100, y=100, file="texture.png", lives=5):
+        super().__init__(*group, x=x, y=y, file=file)
+        self.direction = 1
+        self.file = file
+        self.a = 1
+        self.lives = lives
+        if group[0] == first_players:
+            x = board.left
+            for i in range(lives):
+                Heart(first_hearts, x=x, y=1023, file="heart.png")
+                x += board.cell_size + 5
+        else:
+            x = 1900 + board.left - board.cell_size
+            for i in range(lives):
+                Heart(second_hearts, x=x, y=1023, file="heart.png")
+                x -= board.cell_size + 5
+
+    def update(self, x, y):
+        if self.a:
+            self.rect.x, self.rect.y = x, y
+
+    def flip(self):
+        if self.a:
+            self.image = pygame.transform.flip(self.image, True, False)
+            self.direction = 0 if self.direction else 1
+
+    def damage(self, d):
+        self.lives -= d
+        if first_players.has(self):
+            try:
+                for i in range(d):
+                    first_hearts.sprites()[-1].kill()
+            except IndexError:
+                first_hearts.empty()
+        else:
+            try:
+                for i in range(d):
+                    second_hearts.sprites()[-1].kill()
+            except IndexError:
+                second_hearts.empty()
+        if self.lives < 1:
+            self.die()
+
+    def die(self):
+        if self.a:
+            self.image = pygame.image.load(f"data/dead_{self.file}")
+            self.a = 0
 
 
 class Wall(Sprite):
@@ -137,18 +189,79 @@ class Puddle(Sprite):
     pass
 
 
+class Bullet(pygame.sprite.Sprite):
+    def __init__(self, *group, x=100, y=100, file=None, direction=None, enemy=None, speed=5, damage=1, w=30):
+        super().__init__(*group)
+        if file is None:
+            self.image = pygame.Surface((w, 10), pygame.SRCALPHA, 32)
+            self.image.fill("grey")
+        else:
+            self.image = pygame.image.load(f"data/{file}")
+            self.mask = pygame.mask.from_surface(self.image)
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.direction = direction
+        if direction == 0 or direction == 2:
+            self.image = pygame.transform.rotate(self.image, 90)
+        self.enemy = enemy
+        self.speed = speed
+        self.damage = damage
+
+    def update(self):
+        if pygame.sprite.spritecollideany(self, walls):
+            self.kill()
+        elif pygame.sprite.spritecollideany(self, self.enemy):
+            pygame.sprite.spritecollideany(self, self.enemy).damage(self.damage)
+            self.kill()
+        # elif len(pygame.sprite.spritecollide(self, bullets, False)) > 1:
+        #     pygame.sprite.spritecollide(self, bullets, True)
+        else:
+            if self.direction == 0:
+                self.rect.y -= self.speed
+            elif self.direction == 1:
+                self.rect.x += self.speed
+            elif self.direction == 2:
+                self.rect.y += self.speed
+            elif self.direction == 3:
+                self.rect.x -= self.speed
+
+
+class Heart(Sprite):
+    pass
+
+
 pygame.init()
 screen = pygame.display.set_mode((1920, 1080))
 walls = pygame.sprite.Group()
-players = pygame.sprite.Group()
+first_players = pygame.sprite.Group()
+second_players = pygame.sprite.Group()
 water = pygame.sprite.Group()
-WIDTH, HEIGHT = 38, 21
+bullets = pygame.sprite.Group()
+first_hearts = pygame.sprite.Group()
+second_hearts = pygame.sprite.Group()
+WIDTH, HEIGHT = 38, 20
 board = Board(WIDTH, HEIGHT)
 running = True
-first_player = Player(players, x=10, y=15, file="first_player.png")
-second_player = Player(players, x=1860, y=1015, file="second_player.png")
-second_player.image = pygame.transform.flip(second_player.image, True, False)
+fl = 3  # жизни
+sl = 3
+first_player = Player(first_players, x=board.left, y=board.top, file="first_player.png", lives=fl)
+second_player = Player(second_players, x=1920 - 20 + board.left - board.cell_size,
+                       y=1080 - 30 + board.top - board.cell_size, file="second_player.png", lives=sl)
+second_player.flip()
 background = pygame.image.load("data/background.png")
+first_reload = pygame.USEREVENT + 1
+second_reload = pygame.USEREVENT + 2
+r1 = 1
+r2 = 1
+tr1 = 100  # время перезарядки
+tr2 = 100
+fs = 10  # скорость пули
+ss = 10
+fd = 1  # наносимый урон
+sd = 1
+fw = 30  # длина пули
+sw = 30
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -170,9 +283,62 @@ while running:
                 board.down2()
             if event.key == pygame.K_LEFT:
                 board.left2()
+            if first_player.a and r1:
+                if event.key == pygame.K_i:
+                    Bullet(bullets, x=first_player.rect.x + 20, y=first_player.rect.y - 30, w=fw, direction=0,
+                           enemy=second_players, speed=fs, damage=fd)
+                    r1 = 0
+                    pygame.time.set_timer(first_reload, tr1)
+                if event.key == pygame.K_l:
+                    Bullet(bullets, x=first_player.rect.x + 50, y=first_player.rect.y + 20, w=fw, direction=1,
+                           enemy=second_players, speed=fs, damage=fd)
+                    r1 = 0
+                    pygame.time.set_timer(first_reload, tr1)
+                if event.key == pygame.K_k:
+                    Bullet(bullets, x=first_player.rect.x + 20, y=first_player.rect.y + 50, w=fw, direction=2,
+                           enemy=second_players, speed=fs, damage=fd)
+                    r1 = 0
+                    pygame.time.set_timer(first_reload, tr1)
+                if event.key == pygame.K_j:
+                    Bullet(bullets, x=first_player.rect.x - 30, y=first_player.rect.y + 20, w=fw, direction=3,
+                           enemy=second_players, speed=fs, damage=fd)
+                    r1 = 0
+                    pygame.time.set_timer(first_reload, tr1)
+            if second_player.a and r2:
+                if event.key == pygame.K_KP5:
+                    Bullet(bullets, x=second_player.rect.x + 20, y=second_player.rect.y - 30, w=sw, direction=0,
+                           enemy=first_players, speed=ss, damage=sd)
+                    r2 = 0
+                    pygame.time.set_timer(second_reload, tr2)
+                if event.key == pygame.K_KP3:
+                    Bullet(bullets, x=second_player.rect.x + 50, y=second_player.rect.y + 20, w=sw, direction=1,
+                           enemy=first_players, speed=ss, damage=sd)
+                    r2 = 0
+                    pygame.time.set_timer(second_reload, tr2)
+                if event.key == pygame.K_KP2:
+                    Bullet(bullets, x=second_player.rect.x + 20, y=second_player.rect.y + 50, w=sw, direction=2,
+                           enemy=first_players, speed=ss, damage=sd)
+                    r2 = 0
+                    pygame.time.set_timer(second_reload, tr2)
+                if event.key == pygame.K_KP1:
+                    Bullet(bullets, x=second_player.rect.x - 30, y=second_player.rect.y + 20, w=sw, direction=3,
+                           enemy=first_players, speed=ss, damage=sd)
+                    r2 = 0
+                    pygame.time.set_timer(second_reload, tr2)
+        if event.type == first_reload:
+            r1 = 1
+            pygame.time.set_timer(first_reload, 0)
+        if event.type == second_reload:
+            r2 = 1
+            pygame.time.set_timer(second_reload, 0)
     screen.blit(background, (0, 0))
     board.render()
-    players.draw(screen)
+    first_players.draw(screen)
+    second_players.draw(screen)
     walls.draw(screen)
     water.draw(screen)
+    bullets.update()
+    bullets.draw(screen)
+    first_hearts.draw(screen)
+    second_hearts.draw(screen)
     pygame.display.flip()
