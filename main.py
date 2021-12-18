@@ -12,7 +12,7 @@ class Board:
         self.left = 10
         s = set()
         k = 0
-        while len(s) < 100:
+        while len(s) < WIDTH * HEIGHT // 7:
             s.add(randint(0, WIDTH * HEIGHT - 1))
         for n, i in enumerate(self.board):
             for m, j in enumerate(i):
