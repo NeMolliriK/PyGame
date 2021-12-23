@@ -175,10 +175,14 @@ class Player(Sprite):
                 second_hearts.empty()
         if self.lives < 1:
             self.die()
+        else:
+            damage.play()
 
     def die(self):
         global a, intro_text_1, intro_text_2
         if self.a:
+            pygame.mixer.music.stop()
+            death.play()
             self.image = pygame.image.load(f"data/dead_{self.file}")
             file = open("victories.txt", "a")
             word = morph.parse('секунда')[0]
@@ -206,6 +210,7 @@ class Bullet(pygame.sprite.Sprite):
     def __init__(self, *group, x=100, y=100, file=None, direction=None, enemy=None, speed=5, damage=1, w=30):
         global fshots, sshots
         super().__init__(*group)
+        shot.play()
         if enemy == second_players:
             fshots += 1
         else:
@@ -282,6 +287,8 @@ def create_particles(position):
 
 pygame.init()
 screen = pygame.display.set_mode((1920, 1080))
+pygame.mixer.music.load("data/lobby.mp3")
+pygame.mixer.music.play(-1)
 intro_text = ["Управление:", "WASD - передвижение первого игрока", "IJKL - стрельба первого игрока",
               "Стрелки - передвижение второго игрока", "5123 на нумпаде - стрельба второго игрока",
               "Цель - убить своего оппонента", "Для продолжения:", "нажмите 1 для лёгкого уровня", "2 для среднего",
@@ -348,6 +355,12 @@ while True:
                 sw = 30
                 a = 1
                 ticks = pygame.time.get_ticks()
+                shot = pygame.mixer.Sound("data/shot.wav")
+                damage = pygame.mixer.Sound("data/damage.wav")
+                death = pygame.mixer.Sound("data/death.wav")
+                pygame.mixer.music.load("data/fight.mp3")
+                pygame.mixer.music.play(-1)
+                pygame.mixer.music.set_volume(0.25)
                 while True:
                     for event in pygame.event.get():
                         if event.type == pygame.QUIT:
@@ -431,8 +444,10 @@ while True:
                     second_players.draw(screen)
                     pygame.display.flip()
                     if not a:
-                        sleep(1)
+                        sleep(2.1)
                         intro_text = ["                           ПОБЕДА!!!", intro_text_1, intro_text_2[:-1]]
+                        pygame.mixer.music.load("data/victory.mp3")
+                        pygame.mixer.music.play(-1)
                         while True:
                             for event in pygame.event.get():
                                 if event.type == pygame.QUIT or event.type == pygame.KEYDOWN and \
