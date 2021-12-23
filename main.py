@@ -177,18 +177,18 @@ class Player(Sprite):
             self.die()
 
     def die(self):
-        global a
+        global a, intro_text_1, intro_text_2
         if self.a:
             self.image = pygame.image.load(f"data/dead_{self.file}")
             file = open("victories.txt", "a")
             word = morph.parse('секунда')[0]
             word2 = morph.parse('выстрел')[0]
             t = self.nick == sn
-            file.write(
-                f"{fn if t else sn} победил {self.nick} за {pygame.time.get_ticks() / 1000} "
-                f"{word.make_agree_with_number(pygame.time.get_ticks() // 1000).word} и {fshots if t else sshots} "
-                f"{word2.make_agree_with_number(fshots if t else sshots).word} в "
-                f"{dt.datetime.now().time().isoformat(timespec='minutes')}\n")
+            intro_text_1 = f"{fn if t else sn} победил {self.nick} за {(pygame.time.get_ticks() - ticks) / 1000} " \
+                           f"{word.make_agree_with_number((pygame.time.get_ticks() - ticks) // 1000).word} и "
+            intro_text_2 = f"{fshots if t else sshots} {word2.make_agree_with_number(fshots if t else sshots).word} " \
+                           f"в {dt.datetime.now().time().isoformat(timespec='minutes')}\n"
+            file.write(intro_text_1 + intro_text_2)
             file.close()
             self.a = 0
             a = 0
@@ -232,8 +232,6 @@ class Bullet(pygame.sprite.Sprite):
         elif pygame.sprite.spritecollideany(self, self.enemy):
             pygame.sprite.spritecollideany(self, self.enemy).damage(self.damage)
             self.kill()
-        # elif len(pygame.sprite.spritecollide(self, bullets, False)) > 1:
-        #     pygame.sprite.spritecollide(self, bullets, True)
         else:
             if self.direction == 0:
                 self.rect.y -= self.speed
@@ -254,166 +252,210 @@ def terminate():
     sys.exit()
 
 
+class Particle(pygame.sprite.Sprite):
+    fire = [pygame.image.load("data/star.png")]
+    for scale in (5, 10, 20):
+        fire.append(pygame.transform.scale(fire[0], (scale, scale)))
+
+    def __init__(self, pos, dx, dy):
+        super().__init__(stars)
+        self.image = choice(self.fire)
+        self.rect = self.image.get_rect()
+        self.velocity = [dx, dy]
+        self.rect.x, self.rect.y = pos
+        self.gravity = GRAVITY
+
+    def update(self):
+        self.velocity[1] += self.gravity
+        self.rect.x += self.velocity[0]
+        self.rect.y += self.velocity[1]
+        if not self.rect.colliderect(screen_rect):
+            self.kill()
+
+
+def create_particles(position):
+    particle_count = 20
+    numbers = range(-5, 6)
+    for _ in range(particle_count):
+        Particle(position, choice(numbers), choice(numbers))
+
+
 pygame.init()
 screen = pygame.display.set_mode((1920, 1080))
 intro_text = ["Управление:", "WASD - передвижение первого игрока", "IJKL - стрельба первого игрока",
               "Стрелки - передвижение второго игрока", "5123 на нумпаде - стрельба второго игрока",
-              "Цель - убить своего оппонента"]
+              "Цель - убить своего оппонента", "Для продолжения:", "нажмите 1 для лёгкого уровня", "2 для среднего",
+              "и 3 для сложного"]
 fon = pygame.transform.scale(pygame.image.load('data/background.png'), (1920, 1080))
 screen.blit(fon, (0, 0))
 font = pygame.font.Font(None, 100)
-text_coord = 270
+text_coord = 150
 for line in intro_text:
     string_rendered = font.render(line, 1, pygame.Color('white'))
     intro_rect = string_rendered.get_rect()
     text_coord += 10
     intro_rect.top = text_coord
-    intro_rect.x = 260
+    intro_rect.x = 230
     text_coord += intro_rect.height
     screen.blit(string_rendered, intro_rect)
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             terminate()
-        elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
-            walls = pygame.sprite.Group()
-            first_players = pygame.sprite.Group()
-            second_players = pygame.sprite.Group()
-            water = pygame.sprite.Group()
-            bullets = pygame.sprite.Group()
-            first_hearts = pygame.sprite.Group()
-            second_hearts = pygame.sprite.Group()
-            morph = pymorphy2.MorphAnalyzer()
-            fshots = 0
-            sshots = 0
-            MAP = choice(MAPS)
-            WIDTH, HEIGHT = len(MAP[0][0]), len(MAP[0])
-            board = Board(WIDTH, HEIGHT)
-            fl = 3  # жизни
-            sl = 3
-            fn = "Player 1"  # ники
-            sn = "Player 2"
-            first_player = Player(first_players, x=board.left, y=board.top, file="first_player.png", lives=fl, nick=fn)
-            second_player = Player(second_players, x=1920 - 20 + board.left - board.cell_size,
-                                   y=1080 - 30 + board.top - board.cell_size, file="second_player.png", lives=sl,
-                                   nick=sn)
-            second_player.flip()
-            background = pygame.image.load("data/background.png")
-            first_reload = pygame.USEREVENT + 1
-            second_reload = pygame.USEREVENT + 2
-            r1 = 1
-            r2 = 1
-            tr1 = 100  # время перезарядки
-            tr2 = 100
-            fd = 1  # наносимый урон
-            sd = 1
-            fw = 30  # длина пули
-            sw = 30
-            a = 1
-            while True:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        terminate()
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_w:
-                            board.up1()
-                        if event.key == pygame.K_d:
-                            board.right1()
-                        if event.key == pygame.K_s:
-                            board.down1()
-                        if event.key == pygame.K_a:
-                            board.left1()
-                        if event.key == pygame.K_UP:
-                            board.up2()
-                        if event.key == pygame.K_RIGHT:
-                            board.right2()
-                        if event.key == pygame.K_DOWN:
-                            board.down2()
-                        if event.key == pygame.K_LEFT:
-                            board.left2()
-                        if first_player.a and r1:
-                            if event.key == pygame.K_i:
-                                Bullet(bullets, x=first_player.rect.x + 20, y=first_player.rect.y - 30, w=fw,
-                                       direction=0, enemy=second_players, speed=FS, damage=fd)
-                                r1 = 0
-                                pygame.time.set_timer(first_reload, tr1)
-                            if event.key == pygame.K_l:
-                                Bullet(bullets, x=first_player.rect.x + 50, y=first_player.rect.y + 20, w=fw,
-                                       direction=1, enemy=second_players, speed=FS, damage=fd)
-                                r1 = 0
-                                pygame.time.set_timer(first_reload, tr1)
-                            if event.key == pygame.K_k:
-                                Bullet(bullets, x=first_player.rect.x + 20, y=first_player.rect.y + 50, w=fw,
-                                       direction=2, enemy=second_players, speed=FS, damage=fd)
-                                r1 = 0
-                                pygame.time.set_timer(first_reload, tr1)
-                            if event.key == pygame.K_j:
-                                Bullet(bullets, x=first_player.rect.x - 30, y=first_player.rect.y + 20, w=fw,
-                                       direction=3, enemy=second_players, speed=FS, damage=fd)
-                                r1 = 0
-                                pygame.time.set_timer(first_reload, tr1)
-                        if second_player.a and r2:
-                            if event.key == pygame.K_KP5:
-                                Bullet(bullets, x=second_player.rect.x + 20, y=second_player.rect.y - 30, w=sw,
-                                       direction=0, enemy=first_players, speed=SS, damage=sd)
-                                r2 = 0
-                                pygame.time.set_timer(second_reload, tr2)
-                            if event.key == pygame.K_KP3:
-                                Bullet(bullets, x=second_player.rect.x + 50, y=second_player.rect.y + 20, w=sw,
-                                       direction=1, enemy=first_players, speed=SS, damage=sd)
-                                r2 = 0
-                                pygame.time.set_timer(second_reload, tr2)
-                            if event.key == pygame.K_KP2:
-                                Bullet(bullets, x=second_player.rect.x + 20, y=second_player.rect.y + 50, w=sw,
-                                       direction=2, enemy=first_players, speed=SS, damage=sd)
-                                r2 = 0
-                                pygame.time.set_timer(second_reload, tr2)
-                            if event.key == pygame.K_KP1:
-                                Bullet(bullets, x=second_player.rect.x - 30, y=second_player.rect.y + 20, w=sw,
-                                       direction=3, enemy=first_players, speed=SS, damage=sd)
-                                r2 = 0
-                                pygame.time.set_timer(second_reload, tr2)
-                    if event.type == first_reload:
-                        r1 = 1
-                        pygame.time.set_timer(first_reload, 0)
-                    if event.type == second_reload:
-                        r2 = 1
-                        pygame.time.set_timer(second_reload, 0)
-                screen.blit(background, (0, 0))
-                board.render()
-                first_players.draw(screen)
-                second_players.draw(screen)
-                walls.draw(screen)
-                water.draw(screen)
-                bullets.update()
-                bullets.draw(screen)
-                first_hearts.draw(screen)
-                second_hearts.draw(screen)
-                first_players.draw(screen)
-                second_players.draw(screen)
-                pygame.display.flip()
-                if not a:
-                    sleep(1)
-                    screen.fill("black")
-                    intro_text = ["Управление:", "WASD - передвижение первого игрока", "IJKL - стрельба первого игрока",
-                                  "Стрелки - передвижение второго игрока", "5123 на нумпаде - стрельба второго игрока",
-                                  "Цель - убить своего оппонента"]
-                    fon = pygame.transform.scale(pygame.image.load('data/background.png'), (1920, 1080))
-                    screen.blit(fon, (0, 0))
-                    font = pygame.font.Font(None, 100)
-                    text_coord = 270
-                    for line in intro_text:
-                        string_rendered = font.render(line, 1, pygame.Color('white'))
-                        intro_rect = string_rendered.get_rect()
-                        text_coord += 10
-                        intro_rect.top = text_coord
-                        intro_rect.x = 260
-                        text_coord += intro_rect.height
-                        screen.blit(string_rendered, intro_rect)
-                    while True:
-                        for event in pygame.event.get():
-                            if event.type == pygame.QUIT or event.type == pygame.KEYDOWN or event.type == pygame.\
-                                    MOUSEBUTTONDOWN:
-                                terminate()
-                        pygame.display.flip()
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_1 or event.key == pygame.K_2 or event.key == pygame.K_3:
+                walls = pygame.sprite.Group()
+                first_players = pygame.sprite.Group()
+                second_players = pygame.sprite.Group()
+                water = pygame.sprite.Group()
+                bullets = pygame.sprite.Group()
+                first_hearts = pygame.sprite.Group()
+                second_hearts = pygame.sprite.Group()
+                stars = pygame.sprite.Group()
+                GRAVITY = 1
+                morph = pymorphy2.MorphAnalyzer()
+                fshots = 0
+                sshots = 0
+                if event.key == pygame.K_1:
+                    MAP = MAPS[2]
+                elif event.key == pygame.K_2:
+                    MAP = MAPS[1]
+                else:
+                    MAP = MAPS[0]
+                WIDTH, HEIGHT = len(MAP[0][0]), len(MAP[0])
+                board = Board(WIDTH, HEIGHT)
+                screen_rect = (0, 0, 1920, 1080)
+                fl = 3  # жизни
+                sl = 3
+                fn = "Player 1"  # ники
+                sn = "Player 2"
+                first_player = Player(first_players, x=board.left, y=board.top, file="first_player.png", lives=fl,
+                                      nick=fn)
+                second_player = Player(second_players, x=1920 - 20 + board.left - board.cell_size,
+                                       y=1080 - 30 + board.top - board.cell_size, file="second_player.png", lives=sl,
+                                       nick=sn)
+                second_player.flip()
+                background = pygame.image.load("data/background.png")
+                first_reload = pygame.USEREVENT + 1
+                second_reload = pygame.USEREVENT + 2
+                r1 = 1
+                r2 = 1
+                tr1 = 500  # время перезарядки
+                tr2 = 500
+                fd = 1  # наносимый урон
+                sd = 1
+                fw = 30  # длина пули
+                sw = 30
+                a = 1
+                ticks = pygame.time.get_ticks()
+                while True:
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            terminate()
+                        if event.type == pygame.KEYDOWN:
+                            if event.key == pygame.K_w:
+                                board.up1()
+                            if event.key == pygame.K_d:
+                                board.right1()
+                            if event.key == pygame.K_s:
+                                board.down1()
+                            if event.key == pygame.K_a:
+                                board.left1()
+                            if event.key == pygame.K_UP:
+                                board.up2()
+                            if event.key == pygame.K_RIGHT:
+                                board.right2()
+                            if event.key == pygame.K_DOWN:
+                                board.down2()
+                            if event.key == pygame.K_LEFT:
+                                board.left2()
+                            if first_player.a and r1:
+                                if event.key == pygame.K_i:
+                                    Bullet(bullets, x=first_player.rect.x + 20, y=first_player.rect.y - 30, w=fw,
+                                           direction=0, enemy=second_players, speed=FS, damage=fd)
+                                    r1 = 0
+                                    pygame.time.set_timer(first_reload, tr1)
+                                if event.key == pygame.K_l:
+                                    Bullet(bullets, x=first_player.rect.x + 50, y=first_player.rect.y + 20, w=fw,
+                                           direction=1, enemy=second_players, speed=FS, damage=fd)
+                                    r1 = 0
+                                    pygame.time.set_timer(first_reload, tr1)
+                                if event.key == pygame.K_k:
+                                    Bullet(bullets, x=first_player.rect.x + 20, y=first_player.rect.y + 50, w=fw,
+                                           direction=2, enemy=second_players, speed=FS, damage=fd)
+                                    r1 = 0
+                                    pygame.time.set_timer(first_reload, tr1)
+                                if event.key == pygame.K_j:
+                                    Bullet(bullets, x=first_player.rect.x - 30, y=first_player.rect.y + 20, w=fw,
+                                           direction=3, enemy=second_players, speed=FS, damage=fd)
+                                    r1 = 0
+                                    pygame.time.set_timer(first_reload, tr1)
+                            if second_player.a and r2:
+                                if event.key == pygame.K_KP5:
+                                    Bullet(bullets, x=second_player.rect.x + 20, y=second_player.rect.y - 30, w=sw,
+                                           direction=0, enemy=first_players, speed=SS, damage=sd)
+                                    r2 = 0
+                                    pygame.time.set_timer(second_reload, tr2)
+                                if event.key == pygame.K_KP3:
+                                    Bullet(bullets, x=second_player.rect.x + 50, y=second_player.rect.y + 20, w=sw,
+                                           direction=1, enemy=first_players, speed=SS, damage=sd)
+                                    r2 = 0
+                                    pygame.time.set_timer(second_reload, tr2)
+                                if event.key == pygame.K_KP2:
+                                    Bullet(bullets, x=second_player.rect.x + 20, y=second_player.rect.y + 50, w=sw,
+                                           direction=2, enemy=first_players, speed=SS, damage=sd)
+                                    r2 = 0
+                                    pygame.time.set_timer(second_reload, tr2)
+                                if event.key == pygame.K_KP1:
+                                    Bullet(bullets, x=second_player.rect.x - 30, y=second_player.rect.y + 20, w=sw,
+                                           direction=3, enemy=first_players, speed=SS, damage=sd)
+                                    r2 = 0
+                                    pygame.time.set_timer(second_reload, tr2)
+                        if event.type == first_reload:
+                            r1 = 1
+                            pygame.time.set_timer(first_reload, 0)
+                        if event.type == second_reload:
+                            r2 = 1
+                            pygame.time.set_timer(second_reload, 0)
+                    screen.blit(background, (0, 0))
+                    board.render()
+                    first_players.draw(screen)
+                    second_players.draw(screen)
+                    walls.draw(screen)
+                    water.draw(screen)
+                    bullets.update()
+                    bullets.draw(screen)
+                    first_hearts.draw(screen)
+                    second_hearts.draw(screen)
+                    first_players.draw(screen)
+                    second_players.draw(screen)
+                    pygame.display.flip()
+                    if not a:
+                        sleep(1)
+                        intro_text = ["                           ПОБЕДА!!!", intro_text_1, intro_text_2[:-1]]
+                        clock = pygame.time.Clock()
+                        while True:
+                            for event in pygame.event.get():
+                                if event.type == pygame.QUIT or event.type == pygame.KEYDOWN and \
+                                        event.key == pygame.K_ESCAPE:
+                                    terminate()
+                                if event.type == pygame.MOUSEBUTTONDOWN:
+                                    create_particles(pygame.mouse.get_pos())
+                            screen.fill("black")
+                            fon = pygame.transform.scale(pygame.image.load('data/background.png'), (1920, 1080))
+                            screen.blit(fon, (0, 0))
+                            font = pygame.font.Font(None, 100)
+                            text_coord = 270
+                            for line in intro_text:
+                                string_rendered = font.render(line, 1, pygame.Color('white'))
+                                intro_rect = string_rendered.get_rect()
+                                text_coord += 10
+                                intro_rect.top = text_coord
+                                intro_rect.x = 260
+                                text_coord += intro_rect.height
+                                screen.blit(string_rendered, intro_rect)
+                            stars.update()
+                            stars.draw(screen)
+                            pygame.display.flip()
+                            clock.tick(50)
     pygame.display.flip()
