@@ -433,7 +433,6 @@ while True:
                     if not a:
                         sleep(1)
                         intro_text = ["                           ПОБЕДА!!!", intro_text_1, intro_text_2[:-1]]
-                        clock = pygame.time.Clock()
                         while True:
                             for event in pygame.event.get():
                                 if event.type == pygame.QUIT or event.type == pygame.KEYDOWN and \
@@ -456,5 +455,4 @@ while True:
                             stars.update()
                             stars.draw(screen)
                             pygame.display.flip()
-                            clock.tick(50)
     pygame.display.flip()
