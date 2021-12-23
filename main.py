@@ -1,5 +1,5 @@
 import pygame
-from random import choice
+from random import choice, randint
 import datetime as dt
 import pymorphy2
 from maps import MAPS
@@ -439,8 +439,6 @@ while True:
                                 if event.type == pygame.QUIT or event.type == pygame.KEYDOWN and \
                                         event.key == pygame.K_ESCAPE:
                                     terminate()
-                                if event.type == pygame.MOUSEBUTTONDOWN:
-                                    create_particles(pygame.mouse.get_pos())
                             screen.fill("black")
                             fon = pygame.transform.scale(pygame.image.load('data/background.png'), (1920, 1080))
                             screen.blit(fon, (0, 0))
@@ -454,6 +452,7 @@ while True:
                                 intro_rect.x = 260
                                 text_coord += intro_rect.height
                                 screen.blit(string_rendered, intro_rect)
+                            create_particles((randint(0, 1920), randint(0, 1080)))
                             stars.update()
                             stars.draw(screen)
                             pygame.display.flip()
