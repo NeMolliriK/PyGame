@@ -4,7 +4,6 @@ import datetime as dt
 import pymorphy2
 from maps import MAPS
 import sys
-from time import sleep
 
 
 class Board:
@@ -32,6 +31,7 @@ class Board:
         # 0 - ничего, 1 - стена, 2 - первый игрок, 3 - второй игрок, 4 - вода
 
     def render(self):
+        global first_suffocates, second_suffocates
         x, y = self.left, self.top
         for i in range(self.height):
             for j in range(self.width):
@@ -42,6 +42,22 @@ class Board:
                 x += self.cell_size
             x = self.left
             y += self.cell_size
+        if pygame.sprite.spritecollideany(first_player, gases):
+            if not first_suffocates:
+                pygame.time.set_timer(poisoning_of_first, 1000)
+                first_suffocates = 1
+        else:
+            if first_suffocates:
+                pygame.time.set_timer(poisoning_of_first, 0)
+                first_suffocates = 0
+        if pygame.sprite.spritecollideany(second_player, gases):
+            if not second_suffocates:
+                pygame.time.set_timer(poisoning_of_second, 1000)
+                second_suffocates = 1
+        else:
+            if second_suffocates:
+                pygame.time.set_timer(poisoning_of_second, 0)
+                second_suffocates = 0
 
     def get_click(self, mouse_pos):
         cell = self.get_cell(mouse_pos)
@@ -121,10 +137,17 @@ class Board:
         if second_player.direction:
             second_player.flip()
 
+    def narrowing_of_zone(self):
+        for n in range(HEIGHT):
+            for m in range(WIDTH):
+                if n == z or n == HEIGHT - 1 - z or m == z or m == WIDTH - 1 - z:
+                    Vapors(gases, x=self.left + self.cell_size * m, y=self.top + self.cell_size * n,
+                           file="poisonous_vapors.png")
+
 
 class Sprite(pygame.sprite.Sprite):
     def __init__(self, *group, x=100, y=100, file="texture.png"):
-        super().__init__(*group)
+        super().__init__(*group, all_sprites)
         self.image = pygame.image.load(f"data/{file}")
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = x, y
@@ -134,6 +157,7 @@ class Sprite(pygame.sprite.Sprite):
 class Player(Sprite):
     def __init__(self, *group, x=100, y=100, file="texture.png", lives=5, nick="Player"):
         super().__init__(*group, x=x, y=y, file=file)
+        all_sprites.remove(self)
         self.direction = 1
         self.file = file
         self.a = 1
@@ -173,10 +197,9 @@ class Player(Sprite):
                     second_hearts.sprites()[-1].kill()
             except IndexError:
                 second_hearts.empty()
+        damage.play()
         if self.lives < 1:
             self.die()
-        else:
-            damage.play()
 
     def die(self):
         global a, intro_text_1, intro_text_2
@@ -209,7 +232,7 @@ class Puddle(Sprite):
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, *group, x=100, y=100, file=None, direction=None, enemy=None, speed=5, damage=1, w=30):
         global fshots, sshots
-        super().__init__(*group)
+        super().__init__(*group, all_sprites)
         shot.play()
         if enemy == second_players:
             fshots += 1
@@ -285,6 +308,12 @@ def create_particles(position):
         Particle(position, choice(numbers), choice(numbers))
 
 
+class Vapors(Sprite):
+    def __init__(self, *group, x=100, y=100, file="texture.png"):
+        super().__init__(*group, x=x, y=y, file=file)
+        self.image.set_colorkey(self.image.get_at((0, 0)))
+
+
 pygame.init()
 screen = pygame.display.set_mode((1920, 1080))
 pygame.mixer.music.load("data/lobby.mp3")
@@ -319,6 +348,8 @@ while True:
                 first_hearts = pygame.sprite.Group()
                 second_hearts = pygame.sprite.Group()
                 stars = pygame.sprite.Group()
+                all_sprites = pygame.sprite.Group()
+                gases = pygame.sprite.Group()
                 GRAVITY = 1
                 morph = pymorphy2.MorphAnalyzer()
                 fshots = 0
@@ -349,11 +380,14 @@ while True:
                 r2 = 1
                 tr1 = 500  # время перезарядки
                 tr2 = 500
-                fd = 1  # наносимый урон
+                fd = 1  # урон игроков
                 sd = 1
                 fw = 30  # длина пули
                 sw = 30
+                zone_damage = 1
                 a = 1
+                first_suffocates = 0
+                second_suffocates = 0
                 ticks = pygame.time.get_ticks()
                 shot = pygame.mixer.Sound("data/shot.wav")
                 damage = pygame.mixer.Sound("data/damage.wav")
@@ -361,6 +395,11 @@ while True:
                 pygame.mixer.music.load("data/fight.mp3")
                 pygame.mixer.music.play(-1)
                 pygame.mixer.music.set_volume(0.25)
+                zone = pygame.USEREVENT + 3
+                poisoning_of_first = pygame.USEREVENT + 4
+                poisoning_of_second = pygame.USEREVENT + 5
+                pygame.time.set_timer(zone, 10000)
+                z = 0
                 while True:
                     for event in pygame.event.get():
                         if event.type == pygame.QUIT:
@@ -430,21 +469,22 @@ while True:
                         if event.type == second_reload:
                             r2 = 1
                             pygame.time.set_timer(second_reload, 0)
+                        if event.type == zone:
+                            board.narrowing_of_zone()
+                            z += 1
+                        if event.type == poisoning_of_first:
+                            first_player.damage(zone_damage)
+                        if event.type == poisoning_of_second:
+                            second_player.damage(zone_damage)
                     screen.blit(background, (0, 0))
                     board.render()
                     first_players.draw(screen)
                     second_players.draw(screen)
-                    walls.draw(screen)
-                    water.draw(screen)
-                    bullets.update()
-                    bullets.draw(screen)
-                    first_hearts.draw(screen)
-                    second_hearts.draw(screen)
-                    first_players.draw(screen)
-                    second_players.draw(screen)
+                    all_sprites.update()
+                    all_sprites.draw(screen)
                     pygame.display.flip()
                     if not a:
-                        sleep(2.1)
+                        pygame.time.wait(2100)
                         intro_text = ["                           ПОБЕДА!!!", intro_text_1, intro_text_2[:-1]]
                         pygame.mixer.music.load("data/victory.mp3")
                         pygame.mixer.music.play(-1)
