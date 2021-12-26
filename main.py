@@ -31,7 +31,7 @@ class Board:
         # 0 - ничего, 1 - стена, 2 - первый игрок, 3 - второй игрок, 4 - вода
 
     def render(self):
-        global first_suffocates, second_suffocates
+        global first_suffocates, second_suffocates, draw
         x, y = self.left, self.top
         for i in range(self.height):
             for j in range(self.width):
@@ -42,6 +42,15 @@ class Board:
                 x += self.cell_size
             x = self.left
             y += self.cell_size
+        if pygame.sprite.spritecollideany(first_player,
+                                          gases) and not first_suffocates and pygame.sprite.spritecollideany(
+            second_player,
+                gases) and not second_suffocates and not draw and first_player.lives == second_player.lives:
+            draw = 1
+        elif not pygame.sprite.spritecollideany(first_player,
+                                                gases) and first_suffocates and not pygame.sprite.spritecollideany(
+                second_player, gases) and second_suffocates and draw:
+            draw = 0
         if pygame.sprite.spritecollideany(first_player, gases):
             if not first_suffocates:
                 pygame.time.set_timer(poisoning_of_first, 1000)
@@ -202,20 +211,32 @@ class Player(Sprite):
             self.die()
 
     def die(self):
-        global a, intro_text_1, intro_text_2
+        global a, intro_text_1, intro_text_2, draw, intro_text_3, intro_text_4
         if self.a:
             pygame.mixer.music.stop()
-            death.play()
             self.image = pygame.image.load(f"data/dead_{self.file}")
             file = open("victories.txt", "a")
             word = morph.parse('секунда')[0]
             word2 = morph.parse('выстрел')[0]
             t = self.nick == sn
-            intro_text_1 = f"{fn if t else sn} победил {self.nick} за {(pygame.time.get_ticks() - ticks) / 1000} " \
-                           f"{word.make_agree_with_number((pygame.time.get_ticks() - ticks) // 1000).word} и "
-            intro_text_2 = f"{fshots if t else sshots} {word2.make_agree_with_number(fshots if t else sshots).word} " \
-                           f"в {dt.datetime.now().time().isoformat(timespec='minutes')}\n"
-            file.write(intro_text_1 + intro_text_2)
+            if not draw:
+                death.play()
+                intro_text_1 = f"{fn if t else sn} победил {self.nick} за {(pygame.time.get_ticks() - ticks) / 1000} " \
+                               f"{word.make_agree_with_number((pygame.time.get_ticks() - ticks) // 1000).word} и "
+                intro_text_2 = f"{fshots if t else sshots} " \
+                               f"{word2.make_agree_with_number(fshots if t else sshots).word} в " \
+                               f"{dt.datetime.now().time().isoformat(timespec='minutes')}.\n"
+                file.write(intro_text_1 + intro_text_2)
+            elif draw == 1:
+                simultaneous_death.play()
+                intro_text_1 = f"Ничья. Оба игрока одновременно "
+                intro_text_2 = f"умерли от зоны в {dt.datetime.now().time().isoformat(timespec='minutes')}. "
+                intro_text_3 = f"Всего было произведено {fshots + sshots} " \
+                               f"{word2.make_agree_with_number(fshots + sshots).word}"
+                intro_text_4 = f"в течение {(pygame.time.get_ticks() - ticks) / 1000} " \
+                               f"{word.make_agree_with_number((pygame.time.get_ticks() - ticks) // 1000).word}.\n"
+                draw = 2
+                file.write(intro_text_1 + intro_text_2 + intro_text_3 + intro_text_4)
             file.close()
             self.a = 0
             a = 0
@@ -392,6 +413,7 @@ while True:
                 shot = pygame.mixer.Sound("data/shot.wav")
                 damage = pygame.mixer.Sound("data/damage.wav")
                 death = pygame.mixer.Sound("data/death.wav")
+                simultaneous_death = pygame.mixer.Sound("data/draw.wav")
                 pygame.mixer.music.load("data/fight.mp3")
                 pygame.mixer.music.play(-1)
                 pygame.mixer.music.set_volume(0.25)
@@ -400,6 +422,7 @@ while True:
                 poisoning_of_second = pygame.USEREVENT + 5
                 pygame.time.set_timer(zone, 10000)
                 z = 0
+                draw = 0
                 while True:
                     for event in pygame.event.get():
                         if event.type == pygame.QUIT:
@@ -484,9 +507,15 @@ while True:
                     all_sprites.draw(screen)
                     pygame.display.flip()
                     if not a:
-                        pygame.time.wait(2100)
-                        intro_text = ["                           ПОБЕДА!!!", intro_text_1, intro_text_2[:-1]]
-                        pygame.mixer.music.load("data/victory.mp3")
+                        if not draw:
+                            pygame.time.wait(2100)
+                            intro_text = ["                           ПОБЕДА!!!", intro_text_1, intro_text_2[:-1]]
+                            pygame.mixer.music.load("data/victory.mp3")
+                        else:
+                            pygame.time.wait(2400)
+                            intro_text = ["                           НИЧЬЯ!!!", intro_text_1, intro_text_2,
+                                          intro_text_3, intro_text_4[:-1]]
+                            pygame.mixer.music.load("data/draw.mp3")
                         pygame.mixer.music.play(-1)
                         while True:
                             for event in pygame.event.get():
