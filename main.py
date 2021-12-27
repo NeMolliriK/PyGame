@@ -44,12 +44,12 @@ class Board:
             y += self.cell_size
         if pygame.sprite.spritecollideany(first_player,
                                           gases) and not first_suffocates and pygame.sprite.spritecollideany(
-            second_player,
+                second_player,
                 gases) and not second_suffocates and not draw and first_player.lives == second_player.lives:
             draw = 1
         elif not pygame.sprite.spritecollideany(first_player,
                                                 gases) and first_suffocates and not pygame.sprite.spritecollideany(
-                second_player, gases) and second_suffocates and draw:
+                second_player, gases) and second_suffocates and draw or first_player.lives != second_player.lives:
             draw = 0
         if pygame.sprite.spritecollideany(first_player, gases):
             if not first_suffocates:
