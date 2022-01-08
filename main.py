@@ -215,6 +215,8 @@ class Player(Sprite):
         if self.a:
             pygame.mixer.music.stop()
             self.image = pygame.image.load(f"data/dead_{self.file}")
+            first_players.draw(screen)
+            second_players.draw(screen)
             file = open("victories.txt", "a")
             word = morph.parse('секунда')[0]
             word2 = morph.parse('выстрел')[0]
