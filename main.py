@@ -439,7 +439,8 @@ while True:
 
     pygame.init()
     screen = pygame.display.set_mode((1920, 1020))
-
+    pygame.mixer.music.load("data/lobby.mp3")
+    pygame.mixer.music.play(-1)
     close = Button(x=950, y=900, width=170, height=70, bg='white', active_bg='grey', text_x=40, text_y=18, text='CLOSE',
                    color='black', size=40, round=10, action='close')
     home = Button(x=800, y=900, width=130, height=70, bg='white', active_bg='grey', text_x=25, text_y=18, text='HOME',
